@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sovereign AI Hardware & LLM Calculator</title>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen flex items-center justify-center p-4">
+
+    <div x-data="llmCalc()" class="w-full max-w-2xl bg-gray-800 rounded-xl shadow-2xl border border-gray-700 p-6 space-y-6">
+        <div>
+            <h2 class="text-2xl font-bold text-teal-400">Sovereign LLM Sizing Calculator</h2>
+            <p class="text-gray-400 text-sm mt-1">Balance memory bandwidth, VRAM, and target token latency.</p>
+        </div>
+        
+        <hr class="border-gray-700">
+
+        <!-- Input Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Hardware Specs -->
+            <div class="space-y-4">
+                <h3 class="text-md font-semibold text-gray-300 uppercase tracking-wider">1. Hardware Profile</h3>
+                <div>
+                    <label class="block text-xs text-gray-400 font-medium mb-1">Available VRAM / Unified Memory (GB)</label>
+                    <input type="number" x-model.number="vram" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-teal-500">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 font-medium mb-1">Memory Bandwidth (GB/s)</label>
+                    <input type="number" x-model.number="bandwidth" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-teal-500">
+                </div>
+            </div>
+
+            <!-- Model Specs -->
+            <div class="space-y-4">
+                <h3 class="text-md font-semibold text-gray-300 uppercase tracking-wider">2. Model Target</h3>
+                <div>
+                    <label class="block text-xs text-gray-400 font-medium mb-1">Model Parameter Size (e.g., 8, 14, 70)</label>
+                    <input type="number" x-model.number="params" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-teal-500">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 font-medium mb-1">Quantization Precision (Bits)</label>
+                    <select x-model.number="quant" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-teal-500">
+                        <option value="16">FP16 (16-bit unquantized)</option>
+                        <option value="8">INT8 (8-bit precision)</option>
+                        <option value="6">GGUF Q6 (6-bit)</option>
+                        <option value="4">GGUF Q4 (4-bit standard)</option>
+                        <option value="3">GGUF Q3 (3-bit)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 font-medium mb-1">Target Context Window (Tokens)</label>
+                    <input type="number" x-model.number="context" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-teal-500">
+                </div>
+            </div>
+        </div>
+
+        <!-- Output Display -->
+        <div class="bg-gray-950 rounded-lg p-5 border border-gray-700 space-y-4">
+            <h3 class="text-sm font-semibold text-teal-400 uppercase tracking-wider">Calculated Metrics</h3>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <!-- VRAM Requirement -->
+                <div class="p-3 bg-gray-900 rounded border border-gray-800">
+                    <span class="block text-xs text-gray-400">Required VRAM</span>
+                    <span class="text-xl font-bold" :class="fitsInVram ? 'text-green-400' : 'text-red-400'" x-text="requiredVram.toFixed(2) + ' GB'"></span>
+                    <span class="block text-[10px] text-gray-500 mt-1" x-text="'Incl. 20% overhead & ' + kvCacheSize.toFixed(1) + 'GB KV Cache'"></span>
+                </div>
+
+                <!-- Tokens per Second -->
+                <div class="p-3 bg-gray-900 rounded border border-gray-800">
+                    <span class="block text-xs text-gray-400">Est. Generation Speed</span>
+                    <span class="text-xl font-bold text-teal-300" x-text="tokensPerSecond.toFixed(1) + ' tok/s'"></span>
+                    <span class="block text-[10px] text-gray-500 mt-1" x-text="'Latency: ' + (1000 / tokensPerSecond).toFixed(0) + ' ms/token'"></span>
+                </div>
+            </div>
+
+            <!-- Status Alert Banner -->
+            <div :class="fitsInVram ? 'bg-green-950/40 text-green-300 border-green-800' : 'bg-red-950/40 text-red-300 border-red-800'" class="p-3 rounded text-xs border text-center font-medium">
+                <span x-show="fitsInVram">✔ Hardware verified. Model will run locally at maximum memory bus speeds.</span>
+                <span x-show="!fitsInVram">❌ WARNING: Model exceeds VRAM capacity by <span x-text="(requiredVram - vram).toFixed(1)"></span> GB. Swapping to system RAM will crush execution speeds.</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function llmCalc() {
+            return {
+                vram: 24,
+                bandwidth: 1008,
+                params: 8,
+                quant: 4,
+                context: 4096,
+                efficiency: 0.82,
+
+                get rawWeightsSize() {
+                    return this.params * (this.quant / 8);
+                },
+                get kvCacheSize() {
+                    // Estimated baseline KV cache rule of thumb for standard architectures
+                    return (this.params * this.context * 2) / 1000000;
+                },
+                get requiredVram() {
+                    return (this.rawWeightsSize * 1.2) + this.kvCacheSize;
+                },
+                get fitsInVram() {
+                    return this.requiredVram <= this.vram;
+                },
+                get tokensPerSecond() {
+                    if (this.rawWeightsSize === 0) return 0;
+                    // Max speed when fitting perfectly in memory bandwidth window
+                    let speed = (this.bandwidth * this.efficiency) / this.rawWeightsSize;
+                    return this.fitsInVram ? speed : speed * 0.05; // Drop speed by 95% if it spills to system RAM swap
+                }
+            }
+        }
+    </script>
+</body>
+</html>
