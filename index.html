@@ -6,165 +6,624 @@
     <title>Sovereign AI Hardware & LLM Calculator</title>
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
-        /* Simple, pure CSS tooltips to keep the code fast and dependency-free */
-        .tooltip {
-            position: relative;
-            display: inline-block;
-            cursor: help;
+        :root {
+            --teal: #2dd4bf;
+            --amber: #f59e0b;
+            --red: #f87171;
+            --green: #4ade80;
+            --bg-deep: #080c10;
+            --bg-card: #0d1117;
+            --bg-input: #161b22;
+            --border: #21262d;
+            --border-bright: #30363d;
+            --text-muted: #7d8590;
+            --text-base: #c9d1d9;
+            --text-bright: #e6edf3;
         }
-        .tooltip .tooltiptext {
-            visibility: hidden;
-            width: 240px;
-            background-color: #0f172a; /* Slate 900 */
-            color: #e2e8f0; /* Slate 200 */
-            text-align: left;
-            border: 1px solid #334155; /* Slate 700 */
+
+        * { box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-deep);
+            color: var(--text-base);
+            font-family: 'Space Grotesk', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 2rem 1rem;
+            background-image:
+                radial-gradient(ellipse 80% 50% at 50% -20%, rgba(45,212,191,0.06) 0%, transparent 60%),
+                linear-gradient(180deg, rgba(45,212,191,0.02) 0%, transparent 30%);
+        }
+
+        .mono { font-family: 'IBM Plex Mono', monospace; }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .input-field {
+            width: 100%;
+            background: var(--bg-input);
+            border: 1px solid var(--border-bright);
             border-radius: 6px;
-            padding: 8px 12px;
-            position: absolute;
-            z-index: 50;
-            bottom: 125%; /* Position above the text */
-            left: 50%;
-            margin-left: -120px;
-            opacity: 0;
-            transition: opacity 0.2s;
-            font-size: 0.75rem;
-            line-height: 1.25rem;
-            font-weight: normal;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+            padding: 0.5rem 0.75rem;
+            color: var(--text-bright);
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.875rem;
+            outline: none;
+            transition: border-color 0.15s;
         }
-        .tooltip:hover .tooltiptext {
-            visibility: visible;
-            opacity: 1;
+        .input-field:focus { border-color: var(--teal); }
+
+        .label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            font-weight: 500;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            margin-bottom: 0.35rem;
+        }
+
+        /* Tooltip */
+        .tip { position: relative; display: inline-flex; align-items: center; cursor: help; }
+        .tip-icon {
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            border: 1px solid var(--teal);
+            color: var(--teal);
+            font-size: 9px;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+        .tip-box {
+            visibility: hidden; opacity: 0;
+            position: absolute;
+            bottom: calc(100% + 8px);
+            left: 50%; transform: translateX(-50%);
+            width: 260px;
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 10px 12px;
+            font-size: 0.7rem;
+            line-height: 1.5;
+            color: var(--text-base);
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 400;
+            letter-spacing: 0;
+            text-transform: none;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+            z-index: 100;
+            transition: opacity 0.15s;
+            pointer-events: none;
+        }
+        .tip:hover .tip-box { visibility: visible; opacity: 1; }
+
+        /* Section heading */
+        .section-title {
+            font-size: 0.65rem;
+            font-weight: 600;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--teal);
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Metric card */
+        .metric {
+            background: var(--bg-deep);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1rem;
+        }
+        .metric-label { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.25rem; }
+        .metric-value { font-family: 'IBM Plex Mono', monospace; font-size: 1.4rem; font-weight: 600; line-height: 1; }
+        .metric-sub { font-size: 0.65rem; color: var(--text-muted); margin-top: 0.35rem; font-family: 'IBM Plex Mono', monospace; }
+
+        /* MoE badge */
+        .moe-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            background: rgba(245,158,11,0.1);
+            border: 1px solid rgba(245,158,11,0.3);
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 0.65rem;
+            color: var(--amber);
+            font-weight: 600;
+            letter-spacing: 0.06em;
+        }
+
+        /* Toggle switch */
+        .toggle-wrap { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+        .toggle-track {
+            width: 36px; height: 20px;
+            border-radius: 10px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-bright);
+            position: relative;
+            transition: background 0.2s, border-color 0.2s;
+            flex-shrink: 0;
+        }
+        .toggle-track.on { background: rgba(45,212,191,0.2); border-color: var(--teal); }
+        .toggle-thumb {
+            position: absolute;
+            top: 2px; left: 2px;
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            background: var(--text-muted);
+            transition: transform 0.2s, background 0.2s;
+        }
+        .toggle-track.on .toggle-thumb { transform: translateX(16px); background: var(--teal); }
+
+        /* Offload bar */
+        .bar-track {
+            height: 6px;
+            background: var(--bg-input);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .bar-fill-gpu { height: 100%; border-radius: 3px; background: var(--teal); transition: width 0.2s; display: inline-block; }
+        .bar-fill-cpu { height: 100%; border-radius: 3px; background: var(--amber); transition: width 0.2s; display: inline-block; }
+
+        .divider { border: none; border-top: 1px solid var(--border); margin: 0; }
+
+        /* Responsive grid helpers */
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; }
+        @media (max-width: 560px) {
+            .grid-2 { grid-template-columns: 1fr; }
+            .grid-3 { grid-template-columns: 1fr 1fr; }
+        }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            background: var(--border-bright);
+            outline: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            background: var(--teal);
+            cursor: pointer;
+        }
+        input[type=range]::-moz-range-thumb {
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            background: var(--teal);
+            border: none;
+            cursor: pointer;
         }
     </style>
 </head>
-<body class="bg-gray-900 text-gray-100 min-h-screen flex items-center justify-center p-4">
+<body>
 
-    <div x-data="llmCalc()" class="w-full max-w-2xl bg-gray-800 rounded-xl shadow-2xl border border-gray-700 p-6 space-y-6">
-        <div>
-            <h2 class="text-2xl font-bold text-teal-400">Sovereign LLM Sizing Calculator</h2>
-            <p class="text-gray-400 text-sm mt-1">Balance memory bandwidth, VRAM, and target token latency.</p>
+<div x-data="llmCalc()" style="width:100%;max-width:720px;">
+
+    <!-- Header -->
+    <div style="margin-bottom:1.5rem;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:0.35rem;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+                <path d="M7 7h2v2H7zM11 7h2v2h-2zM15 7h2v2h-2zM7 11h2v2H7zM11 11h2v2h-2zM15 11h2v2h-2z"/>
+            </svg>
+            <h1 style="font-size:1.3rem;font-weight:600;color:#e6edf3;letter-spacing:-0.02em;">Sovereign LLM Sizing Calculator</h1>
         </div>
-        
-        <hr class="border-gray-700">
+        <p style="font-size:0.78rem;color:var(--text-muted);padding-left:34px;">Memory bandwidth · VRAM capacity · MoE sparsity · KV cache quantization</p>
+    </div>
 
-        <!-- Input Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <!-- Hardware Specs -->
-            <div class="space-y-4">
-                <h3 class="text-md font-semibold text-gray-300 uppercase tracking-wider">1. Hardware Profile</h3>
+    <!-- Main card -->
+    <div class="card" style="padding:1.5rem;display:flex;flex-direction:column;gap:1.5rem;">
+
+        <!-- ── Section 1: Hardware ── -->
+        <div>
+            <div class="section-title">1 · Hardware Profile</div>
+            <div class="grid-2">
                 <div>
-                    <label class="block text-xs text-gray-400 font-medium mb-1 tooltip">
-                        Available VRAM / Unified Memory (GB) <span class="text-teal-400 text-[10px]">ⓘ</span>
-                        <span class="tooltiptext">The total high-speed dedicated memory on your GPU(s) or Apple Silicon. Keeping the entire model here is critical; spilling into system RAM destroys performance.</span>
-                    </label>
-                    <input type="number" x-model.number="vram" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-teal-500">
+                    <div class="label">
+                        <span>VRAM / Unified Mem (GB)</span>
+                        <span class="tip">
+                            <span class="tip-icon">i</span>
+                            <span class="tip-box">Total high-speed memory on your GPU(s) or Apple Silicon. The full model must fit here; spilling to system RAM causes a ~95% speed penalty on dense models (less severe with llama.cpp CPU offloading).</span>
+                        </span>
+                    </div>
+                    <input type="number" x-model.number="vram" class="input-field" min="1">
                 </div>
                 <div>
-                    <label class="block text-xs text-gray-400 font-medium mb-1 tooltip">
-                        Memory Bandwidth (GB/s) <span class="text-teal-400 text-[10px]">ⓘ</span>
-                        <span class="tooltiptext">How fast your hardware can read data from memory. LLM generation is strictly bound by this speed because every single parameter must be read for every single token generated.</span>
-                    </label>
-                    <input type="number" x-model.number="bandwidth" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-teal-500">
+                    <div class="label">
+                        <span>GPU Mem Bandwidth (GB/s)</span>
+                        <span class="tip">
+                            <span class="tip-icon">i</span>
+                            <span class="tip-box">How fast your GPU reads from VRAM. LLM decode is strictly memory-bandwidth-bound — every parameter must be read per token generated. Examples: RTX 4090 = 1008 GB/s · A100 80GB = 2000 GB/s · M3 Max = 300 GB/s.</span>
+                        </span>
+                    </div>
+                    <input type="number" x-model.number="gpuBandwidth" class="input-field" min="1">
                 </div>
             </div>
+        </div>
 
-            <!-- Model Specs -->
-            <div class="space-y-4">
-                <h3 class="text-md font-semibold text-gray-300 uppercase tracking-wider">2. Model Target</h3>
-                <div>
-                    <label class="block text-xs text-gray-400 font-medium mb-1 tooltip">
-                        Model Parameter Size (e.g., 8, 14, 70) <span class="text-teal-400 text-[10px]">ⓘ</span>
-                        <span class="tooltiptext">The total number of parameters (in billions) the model contains. Larger models are smarter but require vastly more memory and bandwidth to process.</span>
+        <!-- CPU Offload toggle -->
+        <div class="card" style="padding:1rem;background:var(--bg-deep);">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <label class="toggle-wrap" @click="cpuOffload = !cpuOffload">
+                        <div class="toggle-track" :class="cpuOffload ? 'on' : ''">
+                            <div class="toggle-thumb"></div>
+                        </div>
                     </label>
-                    <input type="number" x-model.number="params" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-teal-500">
+                    <span style="font-size:0.75rem;color:var(--text-base);font-weight:500;">Enable CPU Offload (llama.cpp / Ollama style)</span>
+                    <span class="tip">
+                        <span class="tip-icon">i</span>
+                        <span class="tip-box">When the model exceeds GPU VRAM, inference engines like llama.cpp split layers between GPU and CPU. Speed becomes a weighted harmonic mean of both bandwidths. Enables running large models on modest GPUs.</span>
+                    </span>
+                </div>
+                <span x-show="cpuOffload" class="mono" style="font-size:0.7rem;color:var(--amber);" x-text="gpuLayerPct + '% GPU / ' + (100-gpuLayerPct) + '% CPU'"></span>
+            </div>
+
+            <div x-show="cpuOffload" style="display:flex;flex-direction:column;gap:0.75rem;" x-cloak>
+                <div class="grid-2">
+                    <div>
+                        <div class="label">CPU Mem Bandwidth (GB/s)
+                            <span class="tip"><span class="tip-icon">i</span><span class="tip-box">System RAM bandwidth. DDR5 is ~80 GB/s, DDR4 ~50 GB/s. This is the bottleneck for CPU-side layers. Apple M-series unified memory is already accounted for in the GPU bandwidth field.</span></span>
+                        </div>
+                        <input type="number" x-model.number="cpuBandwidth" class="input-field" min="1">
+                    </div>
+                    <div>
+                        <div class="label">System RAM (GB)
+                            <span class="tip"><span class="tip-icon">i</span><span class="tip-box">Total available system RAM for CPU-offloaded layers and overflow. Only counts toward feasibility if CPU offload is enabled.</span></span>
+                        </div>
+                        <input type="number" x-model.number="systemRam" class="input-field" min="0">
+                    </div>
                 </div>
                 <div>
-                    <label class="block text-xs text-gray-400 font-medium mb-1 tooltip">
-                        Quantization Precision (Bits) <span class="text-teal-400 text-[10px]">ⓘ</span>
-                        <span class="tooltiptext">Compression for model weights. Lower bits drastically reduce VRAM needs and speed up token generation, with only minor hits to model accuracy (4-bit or 5-bit is the sweet spot).</span>
-                    </label>
-                    <select x-model.number="quant" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-teal-500">
-                        <option value="16">FP16 (16-bit unquantized)</option>
-                        <option value="8">INT8 (8-bit precision)</option>
-                        <option value="6">GGUF Q6 (6-bit)</option>
-                        <option value="4">GGUF Q4 (4-bit standard)</option>
-                        <option value="3">GGUF Q3 (3-bit)</option>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                        <div class="label" style="margin:0;">GPU Layer Split</div>
+                        <div style="display:flex;gap:12px;font-size:0.65rem;font-family:'IBM Plex Mono',monospace;">
+                            <span style="color:var(--teal);">■ GPU <span x-text="gpuLayerPct"></span>%</span>
+                            <span style="color:var(--amber);">■ CPU <span x-text="100-gpuLayerPct"></span>%</span>
+                        </div>
+                    </div>
+                    <input type="range" x-model.number="gpuLayerPct" min="0" max="100" step="5">
+                    <div class="bar-track" style="margin-top:6px;">
+                        <div style="display:flex;width:100%;height:6px;">
+                            <div class="bar-fill-gpu" :style="'width:' + gpuLayerPct + '%'"></div>
+                            <div class="bar-fill-cpu" :style="'width:' + (100-gpuLayerPct) + '%'"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <hr class="divider">
+
+        <!-- ── Section 2: Model ── -->
+        <div>
+            <div class="section-title">2 · Model Target</div>
+            <div class="grid-2" style="margin-bottom:1rem;">
+                <div>
+                    <div class="label">Architecture
+                        <span class="tip"><span class="tip-icon">i</span><span class="tip-box">Dense: every parameter is used per token. MoE (Mixture of Experts): only a subset of "expert" layers activate per token, dramatically cutting bandwidth cost at inference while keeping total parameter count high.</span></span>
+                    </div>
+                    <select x-model="archType" class="input-field">
+                        <option value="dense">Dense (standard Transformer)</option>
+                        <option value="moe">MoE — Mixture of Experts</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-xs text-gray-400 font-medium mb-1 tooltip">
-                        Target Context Window (Tokens) <span class="text-teal-400 text-[10px]">ⓘ</span>
-                        <span class="tooltiptext">The length of the conversation history/prompt. Longer context windows consume additional high-speed memory to store the conversation state (KV Cache).</span>
-                    </label>
-                    <input type="number" x-model.number="context" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-teal-500">
+                    <div class="label">Quantization (Weights)
+                        <span class="tip"><span class="tip-icon">i</span><span class="tip-box">Bit-precision for model weights. Lower = smaller VRAM footprint and faster token generation, with minor quality trade-offs. Q4 is the community sweet spot. FP16 is the lossless baseline.</span></span>
+                    </div>
+                    <select x-model.number="quant" class="input-field">
+                        <option value="16">FP16 — 16-bit (unquantized)</option>
+                        <option value="8">INT8 — 8-bit</option>
+                        <option value="6">GGUF Q6 — 6-bit</option>
+                        <option value="5">GGUF Q5 — 5-bit</option>
+                        <option value="4">GGUF Q4 — 4-bit (recommended)</option>
+                        <option value="3">GGUF Q3 — 3-bit</option>
+                        <option value="2">GGUF Q2 — 2-bit</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Dense params -->
+            <div x-show="archType === 'dense'">
+                <div>
+                    <div class="label">Total Parameters (Billions)
+                        <span class="tip"><span class="tip-icon">i</span><span class="tip-box">Total model weight count. For dense models, ALL of these are active every token. E.g. Llama 3.1 70B = 70.</span></span>
+                    </div>
+                    <input type="number" x-model.number="totalParams" class="input-field" min="0.1" step="0.5">
+                </div>
+            </div>
+
+            <!-- MoE params -->
+            <div x-show="archType === 'moe'" style="display:flex;flex-direction:column;gap:0.75rem;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:0.25rem;">
+                    <span class="moe-badge">⚡ MoE Mode</span>
+                    <span style="font-size:0.7rem;color:var(--text-muted);">Only active parameters consume bandwidth per token</span>
+                </div>
+                <div class="grid-2">
+                    <div>
+                        <div class="label">Total Parameters (B)
+                            <span class="tip"><span class="tip-icon">i</span><span class="tip-box">All parameters that must be loaded into memory. E.g. Gemma 4 "26B" has 26B total weights. Qwen3 80B has 80B total weights. All must fit in memory, but only active params use bandwidth.</span></span>
+                        </div>
+                        <input type="number" x-model.number="totalParams" class="input-field" min="0.1" step="0.5" placeholder="e.g. 26">
+                    </div>
+                    <div>
+                        <div class="label">Active Parameters (B) — "AXB"
+                            <span class="tip"><span class="tip-icon">i</span><span class="tip-box">Parameters activated per token decode step. Shown as "AXB" in model names: Gemma 4 26B A4B → 4B active. Qwen3 80B A22B → 22B active. THIS drives your tokens/sec, not total params.</span></span>
+                        </div>
+                        <input type="number" x-model.number="activeParams" class="input-field" min="0.1" step="0.5" placeholder="e.g. 4">
+                    </div>
+                </div>
+                <div class="card" style="padding:0.6rem 0.85rem;background:rgba(245,158,11,0.05);border-color:rgba(245,158,11,0.2);">
+                    <span style="font-size:0.7rem;color:var(--amber);">
+                        MoE sparsity ratio: <span class="mono" x-text="(totalParams > 0 ? ((activeParams/totalParams)*100).toFixed(1) : '—') + '%'"></span> active per token
+                        — bandwidth cost is <span class="mono" x-text="totalParams > 0 ? ((activeParams/totalParams)*100).toFixed(1) + '%' : '—'"></span> of a comparably-sized dense model
+                    </span>
                 </div>
             </div>
         </div>
 
-        <!-- Output Display -->
-        <div class="bg-gray-950 rounded-lg p-5 border border-gray-700 space-y-4">
-            <h3 class="text-sm font-semibold text-teal-400 uppercase tracking-wider">Calculated Metrics</h3>
-            
-            <div class="grid grid-cols-2 gap-4">
-                <!-- VRAM Requirement -->
-                <div class="p-3 bg-gray-900 rounded border border-gray-800 tooltip w-full">
-                    <span class="block text-xs text-gray-400">Required VRAM <span class="text-teal-400 text-[10px]">ⓘ</span></span>
-                    <span class="text-xl font-bold" :class="fitsInVram ? 'text-green-400' : 'text-red-400'" x-text="requiredVram.toFixed(2) + ' GB'"></span>
-                    <span class="block text-[10px] text-gray-500 mt-1" x-text="'Incl. 20% overhead & ' + kvCacheSize.toFixed(1) + 'GB KV Cache'"></span>
-                    <span class="tooltiptext">Calculated as: (Model Size × 1.2 Context Overhead) + calculated KV Cache size. If this number exceeds your hardware's available VRAM, execution speed will stall.</span>
+        <!-- KV Cache -->
+        <div>
+            <div class="section-title">3 · KV Cache</div>
+            <div class="grid-2">
+                <div>
+                    <div class="label">Context Window (Tokens)
+                        <span class="tip"><span class="tip-icon">i</span><span class="tip-box">Conversation history length. KV cache memory grows linearly with context. Long contexts (>32k) can consume several GB even with quantization.</span></span>
+                    </div>
+                    <input type="number" x-model.number="context" class="input-field" min="512" step="512">
+                </div>
+                <div>
+                    <div class="label">KV Cache Quantization
+                        <span class="tip"><span class="tip-icon">i</span><span class="tip-box">llama.cpp supports quantizing the KV cache separately from weights (--cache-type-k / --cache-type-v flags). 4-bit KV can cut cache memory by 4× vs FP16 with minimal quality loss — critical for long contexts.</span></span>
+                    </div>
+                    <select x-model.number="kvQuant" class="input-field">
+                        <option value="16">FP16 — full precision</option>
+                        <option value="8">INT8 — 8-bit KV</option>
+                        <option value="4">Q4 — 4-bit KV (Unsloth dynamic)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <hr class="divider">
+
+        <!-- ── Results ── -->
+        <div>
+            <div class="section-title">Results</div>
+
+            <!-- Key metrics row -->
+            <div class="grid-3" style="margin-bottom:1rem;">
+                <!-- VRAM needed -->
+                <div class="metric">
+                    <div class="metric-label">VRAM Required</div>
+                    <div class="metric-value" :style="fitsInVram ? 'color:var(--green)' : 'color:var(--red)'" x-text="requiredVram.toFixed(1) + ' GB'"></div>
+                    <div class="metric-sub">of <span x-text="totalMemory.toFixed(0)"></span> GB available</div>
                 </div>
 
-                <!-- Tokens per Second -->
-                <div class="p-3 bg-gray-900 rounded border border-gray-800 tooltip w-full">
-                    <span class="block text-xs text-gray-400">Est. Generation Speed <span class="text-teal-400 text-[10px]">ⓘ</span></span>
-                    <span class="text-xl font-bold text-teal-300" x-text="tokensPerSecond.toFixed(1) + ' tok/s'"></span>
-                    <span class="block text-[10px] text-gray-500 mt-1" x-text="'Latency: ' + (1000 / tokensPerSecond).toFixed(0) + ' ms/token'"></span>
-                    <span class="tooltiptext">The estimated speed at which the model will output answers. 30+ tok/s is fast human reading speed. If VRAM is exceeded, this calculation applies a heavy 95% penalty for system RAM swapping.</span>
+                <!-- Decode speed -->
+                <div class="metric">
+                    <div class="metric-label">Decode Speed</div>
+                    <div class="metric-value" style="color:var(--teal)" x-text="decodeSpeed.toFixed(1) + ' tok/s'"></div>
+                    <div class="metric-sub"><span x-text="(1000/Math.max(decodeSpeed,0.01)).toFixed(0)"></span> ms/token</div>
+                </div>
+
+                <!-- Weight size -->
+                <div class="metric">
+                    <div class="metric-label">Weight Footprint</div>
+                    <div class="metric-value" style="color:var(--text-bright)" x-text="totalWeightSize.toFixed(1) + ' GB'"></div>
+                    <div class="metric-sub">KV cache: <span x-text="kvCacheSize.toFixed(2)"></span> GB</div>
                 </div>
             </div>
 
-            <!-- Status Alert Banner -->
-            <div :class="fitsInVram ? 'bg-green-950/40 text-green-300 border-green-800' : 'bg-red-950/40 text-red-300 border-red-800'" class="p-3 rounded text-xs border text-center font-medium">
-                <span x-show="fitsInVram">✔ Hardware verified. Model will run locally at maximum memory bus speeds.</span>
-                <span x-show="!fitsInVram">❌ WARNING: Model exceeds VRAM capacity by <span x-text="(requiredVram - vram).toFixed(1)"></span> GB. Swapping to system RAM will crush execution speeds.</span>
+            <!-- Breakdown bar -->
+            <div class="card" style="padding:0.85rem;background:var(--bg-deep);margin-bottom:1rem;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:0.65rem;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;">
+                    <span>Memory breakdown</span>
+                    <span x-text="requiredVram.toFixed(1) + ' / ' + totalMemory.toFixed(0) + ' GB'"></span>
+                </div>
+                <div class="bar-track" style="height:8px;border-radius:4px;">
+                    <div style="display:flex;height:8px;border-radius:4px;overflow:hidden;">
+                        <!-- weights -->
+                        <div :style="'width:' + Math.min((totalWeightSize/totalMemory)*100, 100).toFixed(1) + '%;background:var(--teal);'" title="Weights"></div>
+                        <!-- overhead -->
+                        <div :style="'width:' + Math.min(((totalWeightSize*0.2)/totalMemory)*100, 100).toFixed(1) + '%;background:rgba(45,212,191,0.35);'" title="20% overhead"></div>
+                        <!-- kv cache -->
+                        <div :style="'width:' + Math.min((kvCacheSize/totalMemory)*100, 100).toFixed(1) + '%;background:var(--amber);'" title="KV Cache"></div>
+                    </div>
+                </div>
+                <div style="display:flex;gap:16px;margin-top:6px;font-size:0.62rem;color:var(--text-muted);font-family:'IBM Plex Mono',monospace;flex-wrap:wrap;">
+                    <span style="color:var(--teal);">■ Weights <span x-text="totalWeightSize.toFixed(1)"></span>GB</span>
+                    <span style="color:rgba(45,212,191,0.5);">■ Overhead <span x-text="(totalWeightSize*0.2).toFixed(1)"></span>GB</span>
+                    <span style="color:var(--amber);">■ KV Cache <span x-text="kvCacheSize.toFixed(2)"></span>GB</span>
+                    <span x-show="cpuOffload" style="color:var(--text-muted);">System RAM: <span x-text="systemRam"></span>GB available</span>
+                </div>
+            </div>
+
+            <!-- Speed breakdown (CPU offload) -->
+            <div class="card" style="padding:0.85rem;background:var(--bg-deep);margin-bottom:1rem;" x-show="cpuOffload">
+                <div style="font-size:0.65rem;color:var(--text-muted);margin-bottom:8px;font-family:'IBM Plex Mono',monospace;">HYBRID SPEED MODEL</div>
+                <div class="grid-2">
+                    <div>
+                        <div style="font-size:0.7rem;color:var(--text-muted);">GPU-only speed</div>
+                        <div class="mono" style="font-size:1rem;color:var(--teal);" x-text="gpuOnlySpeed.toFixed(1) + ' tok/s'"></div>
+                    </div>
+                    <div>
+                        <div style="font-size:0.7rem;color:var(--text-muted);">CPU-only speed</div>
+                        <div class="mono" style="font-size:1rem;color:var(--amber);" x-text="cpuOnlySpeed.toFixed(1) + ' tok/s'"></div>
+                    </div>
+                </div>
+                <div style="margin-top:8px;font-size:0.68rem;color:var(--text-muted);">
+                    Harmonic blend at <span class="mono" x-text="gpuLayerPct"></span>% GPU / <span class="mono" x-text="100-gpuLayerPct"></span>% CPU →
+                    <span class="mono" style="color:var(--text-bright);" x-text="decodeSpeed.toFixed(1) + ' tok/s'"></span>
+                </div>
+            </div>
+
+            <!-- Status banner -->
+            <div :class="statusClass" class="card" style="padding:0.85rem;text-align:center;font-size:0.78rem;font-weight:500;border-radius:6px;">
+                <span x-text="statusMessage"></span>
+            </div>
+
+            <!-- MoE note -->
+            <div x-show="archType === 'moe'" style="margin-top:0.75rem;font-size:0.68rem;color:var(--text-muted);line-height:1.5;padding:0 0.25rem;">
+                <span style="color:var(--amber);">▲ MoE note:</span>
+                Full parameter weight (<span class="mono" x-text="totalWeightSize.toFixed(1)"></span> GB) must reside in memory.
+                Decode bandwidth cost uses only active parameters (<span class="mono" x-text="activeWeightSize.toFixed(1)"></span> GB),
+                which is why MoE models achieve speeds comparable to much smaller dense models.
             </div>
         </div>
     </div>
 
-    <script>
-        function llmCalc() {
-            return {
-                vram: 24,
-                bandwidth: 1008,
-                params: 8,
-                quant: 4,
-                context: 4096,
-                efficiency: 0.82,
+    <!-- Footer -->
+    <div style="margin-top:1rem;text-align:center;font-size:0.65rem;color:var(--text-muted);letter-spacing:0.04em;">
+        VRAM formula: (P × Q/8 × 1.2) + KV_Cache &nbsp;·&nbsp; Speed: BW × η / ActiveWeightSize &nbsp;·&nbsp; MoE: ActiveParams drive bandwidth cost
+    </div>
 
-                get rawWeightsSize() {
-                    return this.params * (this.quant / 8);
-                },
-                get kvCacheSize() {
-                    // Estimated baseline KV cache rule of thumb for standard architectures
-                    return (this.params * this.context * 2) / 1000000;
-                },
-                get requiredVram() {
-                    return (this.rawWeightsSize * 1.2) + this.kvCacheSize;
-                },
-                get fitsInVram() {
-                    return this.requiredVram <= this.vram;
-                },
-                get tokensPerSecond() {
-                    if (this.rawWeightsSize === 0) return 0;
-                    // Max speed when fitting perfectly in memory bandwidth window
-                    let speed = (this.bandwidth * this.efficiency) / this.rawWeightsSize;
-                    return this.fitsInVram ? speed : speed * 0.05; // Drop speed by 95% if it spills to system RAM swap
+</div>
+
+<script>
+function llmCalc() {
+    return {
+        // Hardware
+        vram: 24,
+        gpuBandwidth: 1008,
+        cpuOffload: false,
+        cpuBandwidth: 68,
+        systemRam: 64,
+        gpuLayerPct: 70,
+
+        // Model
+        archType: 'dense',
+        totalParams: 8,
+        activeParams: 4,
+        quant: 4,
+
+        // KV Cache
+        context: 4096,
+        kvQuant: 16,
+
+        // Efficiency
+        efficiency: 0.82,
+
+        // ─── Derived ───
+
+        get effectiveActiveParams() {
+            return this.archType === 'moe' ? this.activeParams : this.totalParams;
+        },
+
+        get totalWeightSize() {
+            // Full model must reside in memory regardless of MoE
+            return this.totalParams * (this.quant / 8);
+        },
+
+        get activeWeightSize() {
+            // Only active params consume bandwidth per token
+            return this.effectiveActiveParams * (this.quant / 8);
+        },
+
+        get kvCacheSize() {
+            // Rule of thumb: KV cache ≈ (totalParams × context × 2 bytes) / 1e6, scaled by KV quant factor
+            const baseKv = (this.totalParams * this.context * 2) / 1_000_000;
+            const kvQuantFactor = this.kvQuant / 16; // relative to FP16 baseline
+            return baseKv * kvQuantFactor;
+        },
+
+        get requiredVram() {
+            return (this.totalWeightSize * 1.2) + this.kvCacheSize;
+        },
+
+        get totalMemory() {
+            return this.cpuOffload ? this.vram + this.systemRam : this.vram;
+        },
+
+        get fitsInVram() {
+            if (this.cpuOffload) {
+                return this.requiredVram <= this.totalMemory;
+            }
+            return this.requiredVram <= this.vram;
+        },
+
+        // GPU-only decode speed
+        get gpuOnlySpeed() {
+            if (this.activeWeightSize === 0) return 0;
+            return (this.gpuBandwidth * this.efficiency) / this.activeWeightSize;
+        },
+
+        // CPU-only decode speed
+        get cpuOnlySpeed() {
+            if (this.activeWeightSize === 0) return 0;
+            return (this.cpuBandwidth * this.efficiency) / this.activeWeightSize;
+        },
+
+        // Harmonic mean of GPU and CPU speeds weighted by layer split
+        get decodeSpeed() {
+            if (this.activeWeightSize === 0) return 0;
+
+            if (!this.cpuOffload) {
+                // No CPU offload — check if fits in VRAM
+                if (this.fitsInVram) {
+                    return this.gpuOnlySpeed;
+                } else {
+                    return this.gpuOnlySpeed * 0.05; // 95% penalty for naive swap
                 }
             }
-        }
-    </script>
+
+            // CPU offload: harmonic mean
+            // Speed = 1 / (fGPU/speedGPU + fCPU/speedCPU)
+            const fGpu = this.gpuLayerPct / 100;
+            const fCpu = 1 - fGpu;
+
+            if (this.gpuOnlySpeed === 0 || this.cpuOnlySpeed === 0) return 0;
+
+            if (fGpu === 0) return this.cpuOnlySpeed;
+            if (fCpu === 0) return this.gpuOnlySpeed;
+
+            if (!this.fitsInVram) {
+                // Can't fit even with offload
+                return (this.cpuBandwidth * this.efficiency) / this.activeWeightSize * 0.5;
+            }
+
+            return 1 / (fGpu / this.gpuOnlySpeed + fCpu / this.cpuOnlySpeed);
+        },
+
+        get statusClass() {
+            if (this.fitsInVram) {
+                return 'background:rgba(74,222,128,0.06);border-color:rgba(74,222,128,0.25);color:var(--green);';
+            }
+            return 'background:rgba(248,113,113,0.06);border-color:rgba(248,113,113,0.25);color:var(--red);';
+        },
+
+        get statusMessage() {
+            if (this.fitsInVram) {
+                if (this.cpuOffload && this.gpuLayerPct < 100) {
+                    return `✔ Fits across GPU + CPU memory. Hybrid decode at ${this.decodeSpeed.toFixed(1)} tok/s (GPU handles ${this.gpuLayerPct}% of layers).`;
+                }
+                return `✔ Hardware verified. Model fits in VRAM — running at full memory bus speed (${this.decodeSpeed.toFixed(1)} tok/s).`;
+            }
+            const overflow = (this.requiredVram - this.totalMemory).toFixed(1);
+            if (this.cpuOffload) {
+                return `❌ Exceeds total memory by ${overflow} GB even with CPU offload. Reduce model size, increase quantization, or shorten context.`;
+            }
+            return `❌ Exceeds VRAM by ${(this.requiredVram - this.vram).toFixed(1)} GB. Enable CPU offload or reduce model/context size.`;
+        },
+    };
+}
+</script>
 </body>
 </html>
