@@ -1,54 +1,78 @@
 # Sovereign AI Hardware & LLM Sizing Calculator
 
-An interactive, web-based utility for architects, engineers, and AI practitioners to determine the maximum Large Language Model (LLM) size a specific hardware profile can support without compromising on latency.
+An interactive, single-file web tool for architects, engineers, and AI practitioners to determine whether a target LLM fits on a given hardware profile — and how fast it will run.
 
-## 🚀 Overview
+## Overview
 
-In the generative era, local model execution speed is rarely limited by the number of compute cores (TFLOPS). Instead, it is almost entirely **memory-bandwidth bound**. This calculator provides a mathematical audit of your hardware to ensure your model fits entirely within VRAM and calculates the expected tokens-per-second based on your memory bus width.
+Local model execution is almost entirely **memory-bandwidth bound**, not compute bound. This calculator audits your hardware across four dimensions: VRAM capacity, memory bandwidth, KV cache size, and CPU offload headroom.
 
-## 📐 The Mathematics of Latency
+## Running Locally
 
-This tool utilizes two primary formulas to determine model feasibility and performance.
+```bash
+python3 launch.py
+```
 
-### 1. VRAM Capacity Formula
-To avoid "swapping" to system RAM (which causes a ~95% drop in speed), the model and its operational buffers must fit within available Video RAM.
+Opens `http://localhost:8080` in your browser automatically. No install required.
 
-$$M_{total} = (P \times \frac{Q}{8} \times 1.2) + M_{context}$$
+## The Math
 
-* **$P$ (Parameters):** Total count of model weights (in Billions).
-* **$Q$ (Quantization):** Bit-precision (e.g., 4-bit, 8-bit). Dividing by 8 converts bits to bytes.
-* **1.2:** A 20% multiplier for framework overhead and activation buffers.
-* **$M_{context}$:** The memory required for the **KV (Key-Value) Cache**, which grows with the length of the conversation history.
+### VRAM Capacity
 
-### 2. Token Generation Latency
-Because LLM generation is sequential, every parameter must be read from memory to compute a single token. Therefore, your **Memory Bandwidth** is the speed limit.
+$$M_{total} = (P \times \frac{Q}{8} \times 1.2) + M_{kv}$$
 
-$$\text{Tokens Per Second} = \frac{\text{Memory Bandwidth (GB/s)} \times \eta}{\text{Model Size (GB)}}$$
+| Symbol | Meaning |
+|--------|---------|
+| $P$ | Total parameters (billions) |
+| $Q$ | Quantization bit-width |
+| $1.2$ | 20% overhead for activations & framework buffers |
+| $M_{kv}$ | KV cache size (scaled by KV quantization factor) |
 
-* **$\eta$ (Efficiency Factor):** Real-world utilization of the memory bus (typically 80-85%).
-* **Model Size:** The raw weight size ($P \times \frac{Q}{8}$).
+### Token Generation Speed
 
----
+$$\text{tok/s} = \frac{\text{Bandwidth (GB/s)} \times \eta}{\text{Active Weight Size (GB)}}$$
 
-## 🛠️ Features
+For MoE models, **active parameters** drive bandwidth cost — not total parameters. For CPU offload, speed is the harmonic mean of GPU and CPU bandwidth weighted by the layer split percentage.
 
-- **Interactive Sizing:** Real-time calculation of VRAM requirements.
-- **Latency Estimation:** Predicts tokens per second and milliseconds per token.
-- **Safety Alerts:** Visual warnings when model requirements exceed hardware capacity.
-- **Educational Tooltips:** Hover-over explanations for technical terms like *Quantization*, *KV Cache*, and *Memory Bandwidth*.
-
-## 📦 Deployment
-
-This is a single-file solution using **Tailwind CSS** for styling and **Alpine.js** for reactivity. 
-
-1.  Save the provided `index.html` to your local machine.
-2.  Host it for free via [GitHub Pages](https://pages.github.com/) or [Vercel](https://vercel.com/).
-3.  Share the link in your internal Slack channels or LinkedIn posts to help others audit their AI infrastructure.
+$$\text{tok/s}_{hybrid} = \frac{1}{\frac{f_{GPU}}{\text{tok/s}_{GPU}} + \frac{f_{CPU}}{\text{tok/s}_{CPU}}}$$
 
 ---
 
-## 🛡️ Sovereign AI Focus
+## Features
 
-This calculator is designed for the **Sovereign AI** movement—enabling organizations to run private models on their own "Big Iron" or edge hardware without relying on third-party API providers.
+### Hardware
+- **VRAM / Unified Memory** — total GPU or Apple Silicon memory
+- **GPU Memory Bandwidth** — the primary speed constraint (e.g. RTX 4090 = 1008 GB/s, M3 Max = 300 GB/s)
+- **CPU Offload (llama.cpp / Ollama)** — toggle to enable layer splitting between GPU and CPU with an adjustable slider; speed uses harmonic mean of both bandwidths
 
-*“If you don't own the hardware, you don't own the intelligence.”*
+### Model
+- **Architecture** — Dense (all params active per token) or MoE with separate total/active parameter fields
+- **Quantization** — FP16 · INT8 · Q6 · Q5 · Q4 · Q3 · Q2
+- **MoE sparsity readout** — shows active % and bandwidth cost relative to an equivalent dense model
+
+### KV Cache
+- **Context window** — scales cache size linearly
+- **KV Cache Quantization** — FP16 / INT8 / Q4, matching llama.cpp `--cache-type-k/v` flags
+
+### Results
+- Required VRAM vs. available (color-coded pass/fail)
+- Estimated decode speed in tok/s and ms/token
+- Visual memory breakdown bar (weights · overhead · KV cache)
+- Hybrid speed breakdown when CPU offload is enabled
+
+---
+
+## Deployment
+
+Single-file, zero-build. Requires internet for CDN assets (Alpine.js, Tailwind CSS, IBM Plex Mono font).
+
+1. Clone the repo
+2. Run `python3 launch.py` for local use, or
+3. Deploy `index.html` via [GitHub Pages](https://pages.github.com/) or [Vercel](https://vercel.com/)
+
+---
+
+## Sovereign AI Focus
+
+Built for organizations running private models on their own hardware — no cloud API dependency, no telemetry.
+
+*"If you don't own the hardware, you don't own the intelligence."*
